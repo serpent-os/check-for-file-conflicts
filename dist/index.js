@@ -26563,8 +26563,8 @@ try {
         // const pkgs = manifestContentParsed.packages
         pkgs.forEach((value, key) => {
             value.files.forEach(filepath => {
-                let tempPkgs = allFiles.get(filepath);
-                if (tempPkgs == undefined) {
+                const tempPkgs = allFiles.get(filepath);
+                if (tempPkgs === undefined) {
                     allFiles.set(filepath, [key]);
                 }
                 else {
@@ -26579,7 +26579,7 @@ try {
             conflicts.set(key, value);
         }
     });
-    var output;
+    let output;
     if (conflicts.size > 1) {
         output = 'Duplicates detected:';
         conflicts.forEach((value, key) => {
@@ -26588,7 +26588,7 @@ try {
                 output = output.concat('\n', `      - ${value}`);
             });
         });
-        //console.log(output)
+        // console.log(output)
         core.setOutput('packages', output);
         core.setFailed(output);
     }
