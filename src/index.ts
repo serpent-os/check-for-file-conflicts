@@ -57,7 +57,7 @@ try {
 
   let output: string
   if (conflicts.size > 1) {
-    output = 'Duplicates detected:'
+    output = `${conflicts.size} duplicates detected:`
     conflicts.forEach((value, key) => {
       output = output.concat('\n', `  - File: ${key}\n    Packages:`)
       value.forEach(value => {
