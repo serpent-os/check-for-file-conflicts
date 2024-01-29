@@ -2051,7 +2051,7 @@ function isLoopbackAddress(host) {
         if (v !== undefined) module.exports = v;
     }
     else if (typeof define === "function" && define.amd) {
-        define(["require", "exports", "./scanner"], factory);
+        define(["require", "exports", "./scanner", "./string-intern"], factory);
     }
 })(function () {
     /*---------------------------------------------------------------------------------------------
@@ -2062,6 +2062,7 @@ function isLoopbackAddress(host) {
     Object.defineProperty(exports, "__esModule", ({ value: true }));
     exports.isEOL = exports.format = void 0;
     const scanner_1 = __nccwpck_require__(2122);
+    const string_intern_1 = __nccwpck_require__(2347);
     function format(documentText, range, options) {
         let initialIndentLevel;
         let formatText;
@@ -2090,24 +2091,31 @@ function isLoopbackAddress(host) {
             rangeEnd = documentText.length;
         }
         const eol = getEOL(options, documentText);
+        const eolFastPathSupported = string_intern_1.supportedEols.includes(eol);
         let numberLineBreaks = 0;
         let indentLevel = 0;
         let indentValue;
         if (options.insertSpaces) {
-            indentValue = repeat(' ', options.tabSize || 4);
+            indentValue = string_intern_1.cachedSpaces[options.tabSize || 4] ?? repeat(string_intern_1.cachedSpaces[1], options.tabSize || 4);
         }
         else {
             indentValue = '\t';
         }
+        const indentType = indentValue === '\t' ? '\t' : ' ';
         let scanner = (0, scanner_1.createScanner)(formatText, false);
         let hasError = false;
         function newLinesAndIndent() {
             if (numberLineBreaks > 1) {
                 return repeat(eol, numberLineBreaks) + repeat(indentValue, initialIndentLevel + indentLevel);
             }
-            else {
+            const amountOfSpaces = indentValue.length * (initialIndentLevel + indentLevel);
+            if (!eolFastPathSupported || amountOfSpaces > string_intern_1.cachedBreakLinesWithSpaces[indentType][eol].length) {
                 return eol + repeat(indentValue, initialIndentLevel + indentLevel);
             }
+            if (amountOfSpaces <= 0) {
+                return eol;
+            }
+            return string_intern_1.cachedBreakLinesWithSpaces[indentType][eol][amountOfSpaces];
         }
         function scanNext() {
             let token = scanner.scan();
@@ -2136,7 +2144,9 @@ function isLoopbackAddress(host) {
         }
         if (firstToken !== 17 /* SyntaxKind.EOF */) {
             let firstTokenStart = scanner.getTokenOffset() + formatTextStart;
-            let initialIndent = repeat(indentValue, initialIndentLevel);
+            let initialIndent = (indentValue.length * initialIndentLevel < 20) && options.insertSpaces
+                ? string_intern_1.cachedSpaces[indentValue.length * initialIndentLevel]
+                : repeat(indentValue, initialIndentLevel);
             addEdit(initialIndent, formatTextStart, firstTokenStart);
         }
         while (firstToken !== 17 /* SyntaxKind.EOF */) {
@@ -2146,7 +2156,7 @@ function isLoopbackAddress(host) {
             let needsLineBreak = false;
             while (numberLineBreaks === 0 && (secondToken === 12 /* SyntaxKind.LineCommentTrivia */ || secondToken === 13 /* SyntaxKind.BlockCommentTrivia */)) {
                 let commentTokenStart = scanner.getTokenOffset() + formatTextStart;
-                addEdit(' ', firstTokenEnd, commentTokenStart);
+                addEdit(string_intern_1.cachedSpaces[1], firstTokenEnd, commentTokenStart);
                 firstTokenEnd = scanner.getTokenOffset() + scanner.getTokenLength() + formatTextStart;
                 needsLineBreak = secondToken === 12 /* SyntaxKind.LineCommentTrivia */;
                 replaceContent = needsLineBreak ? newLinesAndIndent() : '';
@@ -2161,7 +2171,7 @@ function isLoopbackAddress(host) {
                     replaceContent = newLinesAndIndent();
                 }
                 else if (options.keepLines) {
-                    replaceContent = ' ';
+                    replaceContent = string_intern_1.cachedSpaces[1];
                 }
             }
             else if (secondToken === 4 /* SyntaxKind.CloseBracketToken */) {
@@ -2173,7 +2183,7 @@ function isLoopbackAddress(host) {
                     replaceContent = newLinesAndIndent();
                 }
                 else if (options.keepLines) {
-                    replaceContent = ' ';
+                    replaceContent = string_intern_1.cachedSpaces[1];
                 }
             }
             else {
@@ -2185,7 +2195,7 @@ function isLoopbackAddress(host) {
                             replaceContent = newLinesAndIndent();
                         }
                         else {
-                            replaceContent = ' ';
+                            replaceContent = string_intern_1.cachedSpaces[1];
                         }
                         break;
                     case 5 /* SyntaxKind.CommaToken */:
@@ -2193,7 +2203,7 @@ function isLoopbackAddress(host) {
                             replaceContent = newLinesAndIndent();
                         }
                         else {
-                            replaceContent = ' ';
+                            replaceContent = string_intern_1.cachedSpaces[1];
                         }
                         break;
                     case 12 /* SyntaxKind.LineCommentTrivia */:
@@ -2204,7 +2214,7 @@ function isLoopbackAddress(host) {
                             replaceContent = newLinesAndIndent();
                         }
                         else if (!needsLineBreak) {
-                            replaceContent = ' ';
+                            replaceContent = string_intern_1.cachedSpaces[1];
                         }
                         break;
                     case 6 /* SyntaxKind.ColonToken */:
@@ -2212,7 +2222,7 @@ function isLoopbackAddress(host) {
                             replaceContent = newLinesAndIndent();
                         }
                         else if (!needsLineBreak) {
-                            replaceContent = ' ';
+                            replaceContent = string_intern_1.cachedSpaces[1];
                         }
                         break;
                     case 10 /* SyntaxKind.StringLiteral */:
@@ -2234,7 +2244,7 @@ function isLoopbackAddress(host) {
                         }
                         else {
                             if ((secondToken === 12 /* SyntaxKind.LineCommentTrivia */ || secondToken === 13 /* SyntaxKind.BlockCommentTrivia */) && !needsLineBreak) {
-                                replaceContent = ' ';
+                                replaceContent = string_intern_1.cachedSpaces[1];
                             }
                             else if (secondToken !== 5 /* SyntaxKind.CommaToken */ && secondToken !== 17 /* SyntaxKind.EOF */) {
                                 hasError = true;
@@ -2277,7 +2287,7 @@ function isLoopbackAddress(host) {
         const tabSize = options.tabSize || 4;
         while (i < content.length) {
             let ch = content.charAt(i);
-            if (ch === ' ') {
+            if (ch === string_intern_1.cachedSpaces[1]) {
                 nChars++;
             }
             else if (ch === '\t') {
@@ -3439,6 +3449,55 @@ function isLoopbackAddress(host) {
 
 /***/ }),
 
+/***/ 2347:
+/***/ ((module, exports) => {
+
+(function (factory) {
+    if ( true && typeof module.exports === "object") {
+        var v = factory(require, exports);
+        if (v !== undefined) module.exports = v;
+    }
+    else if (typeof define === "function" && define.amd) {
+        define(["require", "exports"], factory);
+    }
+})(function () {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", ({ value: true }));
+    exports.supportedEols = exports.cachedBreakLinesWithSpaces = exports.cachedSpaces = void 0;
+    exports.cachedSpaces = new Array(20).fill(0).map((_, index) => {
+        return ' '.repeat(index);
+    });
+    const maxCachedValues = 200;
+    exports.cachedBreakLinesWithSpaces = {
+        ' ': {
+            '\n': new Array(maxCachedValues).fill(0).map((_, index) => {
+                return '\n' + ' '.repeat(index);
+            }),
+            '\r': new Array(maxCachedValues).fill(0).map((_, index) => {
+                return '\r' + ' '.repeat(index);
+            }),
+            '\r\n': new Array(maxCachedValues).fill(0).map((_, index) => {
+                return '\r\n' + ' '.repeat(index);
+            }),
+        },
+        '\t': {
+            '\n': new Array(maxCachedValues).fill(0).map((_, index) => {
+                return '\n' + '\t'.repeat(index);
+            }),
+            '\r': new Array(maxCachedValues).fill(0).map((_, index) => {
+                return '\r' + '\t'.repeat(index);
+            }),
+            '\r\n': new Array(maxCachedValues).fill(0).map((_, index) => {
+                return '\r\n' + '\t'.repeat(index);
+            }),
+        }
+    };
+    exports.supportedEols = ['\n', '\r', '\r\n'];
+});
+
+
+/***/ }),
+
 /***/ 245:
 /***/ ((module, exports, __nccwpck_require__) => {
 
@@ -3476,7 +3535,7 @@ function isLoopbackAddress(host) {
         ScanError[ScanError["InvalidUnicode"] = 4] = "InvalidUnicode";
         ScanError[ScanError["InvalidEscapeCharacter"] = 5] = "InvalidEscapeCharacter";
         ScanError[ScanError["InvalidCharacter"] = 6] = "InvalidCharacter";
-    })(ScanError = exports.ScanError || (exports.ScanError = {}));
+    })(ScanError || (exports.ScanError = ScanError = {}));
     var SyntaxKind;
     (function (SyntaxKind) {
         SyntaxKind[SyntaxKind["OpenBraceToken"] = 1] = "OpenBraceToken";
@@ -3496,7 +3555,7 @@ function isLoopbackAddress(host) {
         SyntaxKind[SyntaxKind["Trivia"] = 15] = "Trivia";
         SyntaxKind[SyntaxKind["Unknown"] = 16] = "Unknown";
         SyntaxKind[SyntaxKind["EOF"] = 17] = "EOF";
-    })(SyntaxKind = exports.SyntaxKind || (exports.SyntaxKind = {}));
+    })(SyntaxKind || (exports.SyntaxKind = SyntaxKind = {}));
     /**
      * For a given offset, evaluate the location in the JSON document. Each segment in the location path is either a property name or an array index.
      */
@@ -3554,7 +3613,7 @@ function isLoopbackAddress(host) {
         ParseErrorCode[ParseErrorCode["InvalidUnicode"] = 14] = "InvalidUnicode";
         ParseErrorCode[ParseErrorCode["InvalidEscapeCharacter"] = 15] = "InvalidEscapeCharacter";
         ParseErrorCode[ParseErrorCode["InvalidCharacter"] = 16] = "InvalidCharacter";
-    })(ParseErrorCode = exports.ParseErrorCode || (exports.ParseErrorCode = {}));
+    })(ParseErrorCode || (exports.ParseErrorCode = ParseErrorCode = {}));
     function printParseErrorCode(code) {
         switch (code) {
             case 1 /* ParseErrorCode.InvalidSymbol */: return 'InvalidSymbol';
